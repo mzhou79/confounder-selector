@@ -1,4 +1,4 @@
 interface:
   display_name: "Confounder Selector"
-  short_description: "Evidence-grounded confounder assessment for observational studies"
-  default_prompt: "Help me identify potential confounders for an observational epidemiology study using my uploaded papers and PubMed research."
+  short_description: "Confounders traced to real, verified papers, with causal roles and a DAG check"
+  default_prompt: "Help me choose confounders for my observational study. I'll give the target population, exposure, outcome, and the papers I must cite; trace every suggested confounder to a real paper."
