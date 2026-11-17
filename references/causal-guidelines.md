@@ -20,5 +20,15 @@ Specify population, eligibility, time zero, exposure intervention/comparison, ou
 6. Avoid automated causal certainty. Recommend expert DAG review; where available, use DAGitty or equivalent to inspect d-separation.
 7. Consider selection bias, time-varying confounding, informative censoring, measurement error, positivity, and missingness.
 
+## When the DAG is uncertain: modified disjunctive cause criterion
+VanderWeele TJ. Principles of confounder selection. *Eur J Epidemiol.* 2019;34(3):211–219. PMID 30840181; doi:10.1007/s10654-019-00494-6 (verified on PubMed 2026-11-16).
+
+If you can say, for each pre-exposure covariate, whether it causes the exposure and/or the outcome, but you cannot specify the full DAG:
+1. Adjust for each pre-exposure covariate that is a cause of the exposure, the outcome, or both.
+2. Exclude variables known to be instruments (causes of the exposure with no other path to the outcome).
+3. Include good proxies for unmeasured common causes of exposure and outcome.
+
+Report this set next to the DAG-based minimal sets from `scripts/dag_tools.py` and explain any differences. Evidence of `causes_exposure`/`causes_outcome` in the ledger is the input to step 1.
+
 ## Exercise → blood pressure example
 Age and socioeconomic context may be pre-exposure common causes worth investigating. BMI may be a pre-exposure common cause **or** partly a mediator of sustained exercise, depending on time zero and history. Smoking may be a marker of shared behavioral/social causes; causal status must be justified. Do not present these as established confounders without source-specific evidence and DAG assumptions.

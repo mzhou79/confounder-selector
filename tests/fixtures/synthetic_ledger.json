@@ -1,0 +1,33 @@
+{
+  "schema_version": "2.0",
+  "question": {
+    "population": "Community-dwelling adults aged 40-75 without hypertension at baseline",
+    "exposures": ["exercise >=30 min/day"],
+    "comparator": "exercise <30 min/day",
+    "outcomes": ["systolic blood pressure at 5 years"],
+    "design": "cohort",
+    "estimand": "total_effect",
+    "time_zero": "baseline visit"
+  },
+  "search_log": [
+    {"source": "PubMed", "query": "(exercise[tiab] OR physical activity[tiab]) AND blood pressure[tiab] AND cohort[tiab]", "date": "2026-11-16", "purpose": "exposure_outcome_studies", "n_results": 412}
+  ],
+  "papers": [
+    {"id": "U1", "title": "SYNTHETIC uploaded study (test fixture, not a real paper)", "source_type": "uploaded", "required": true, "access_level": "uploaded_full_text", "verification_status": "not_applicable"},
+    {"id": "R1", "title": "SYNTHETIC retrieved study (test fixture, not a real paper)", "pmid": "1", "source_type": "retrieved", "required": false, "access_level": "abstract", "verification_status": "verified", "verified_via": "pubmed", "verified_on": "2026-11-16"}
+  ],
+  "candidates": [
+    {"variable": "age", "measurement_timing": "pre_exposure", "role": "candidate confounder", "recommendation": "adjust", "rationale": "Plausible common cause of activity and BP",
+     "evidence": [
+       {"paper_id": "U1", "support_type": "adjusted_in_model", "location": "Table 2 footnote", "finding": "Model adjusted for age"},
+       {"paper_id": "R1", "support_type": "associated_with_exposure", "location": "Abstract", "finding": "Activity declined with age"}
+     ]},
+    {"variable": "bmi", "measurement_timing": "post_exposure", "role": "possible mediator", "recommendation": "do_not_adjust", "rationale": "Measured after exercise begins; likely on causal path",
+     "evidence": [{"paper_id": "R1", "support_type": "mediator_evidence", "location": "Discussion", "finding": "BMI partly explained the association"}]}
+  ],
+  "dag": {
+    "exposure": "exercise", "outcome": "sbp",
+    "edges": [["age", "exercise"], ["age", "sbp"], ["exercise", "bmi"], ["bmi", "sbp"], ["exercise", "sbp"]],
+    "edge_sources": {"age->exercise": ["R1"], "age->sbp": ["U1"]}
+  }
+}

@@ -1,10 +1,103 @@
 {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Confounder Selector evidence ledger",
+  "description": "Single source of truth for ledger structure. scripts/validate_evidence.py enforces this schema plus the cross-field provenance rules documented in references/literature-protocol.md.",
   "type": "object",
-  "required": ["question", "search_log", "papers", "candidates"],
+  "required": ["schema_version", "question", "search_log", "papers", "candidates"],
   "properties": {
-    "question": {"type": "string", "minLength": 5},
-    "search_log": {"type": "array", "items": {"type": "object", "required": ["source", "query", "date"], "properties": {"source": {"type": "string"}, "query": {"type": "string"}, "date": {"type": "string"}}}},
-    "papers": {"type": "array", "items": {"type": "object", "required": ["id", "title", "source_type", "access_level", "verification_status"], "properties": {"id": {"type": "string"}, "title": {"type": "string", "minLength": 1}, "source_type": {"enum": ["uploaded", "retrieved"]}, "access_level": {"enum": ["full_text", "abstract", "metadata", "uploaded_full_text"]}, "verification_status": {"enum": ["verified", "unverified", "not_applicable"]}, "pmid": {"type": "string", "pattern": "^[0-9]+$"}, "doi": {"type": "string", "minLength": 3}}}},
-    "candidates": {"type": "array", "items": {"type": "object", "required": ["variable", "role", "rationale", "paper_ids", "recommendation"], "properties": {"variable": {"type": "string", "minLength": 1}, "role": {"enum": ["candidate confounder", "possible mediator", "possible collider/selection variable", "precision variable", "uncertain", "not recommended for primary adjustment"]}, "rationale": {"type": "string", "minLength": 1}, "paper_ids": {"type": "array", "items": {"type": "string"}}, "recommendation": {"type": "string", "minLength": 1}}}}
+    "schema_version": {"type": "string", "enum": ["2.0"]},
+    "question": {
+      "type": "object",
+      "required": ["population", "exposures", "outcomes", "estimand"],
+      "properties": {
+        "population": {"type": "string", "minLength": 3},
+        "exposures": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "comparator": {"type": "string"},
+        "outcomes": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "design": {"type": "string", "enum": ["cohort", "case-control", "cross-sectional", "case-crossover", "other", "unspecified"]},
+        "estimand": {"type": "string", "enum": ["total_effect", "direct_effect", "unspecified"]},
+        "time_zero": {"type": "string"},
+        "assumptions": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "search_log": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["source", "query", "date", "purpose"],
+        "properties": {
+          "source": {"type": "string", "minLength": 1},
+          "query": {"type": "string", "minLength": 1},
+          "date": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},
+          "purpose": {"type": "string", "enum": ["exposure_outcome_studies", "candidate_exposure_link", "candidate_outcome_link", "review", "other"]},
+          "candidate": {"type": "string"},
+          "n_results": {"type": "integer", "minimum": 0}
+        }
+      }
+    },
+    "papers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "source_type", "required", "access_level", "verification_status"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "title": {"type": "string", "minLength": 1},
+          "first_author": {"type": "string"},
+          "year": {"type": "integer", "minimum": 1800, "maximum": 2100},
+          "journal": {"type": "string"},
+          "pmid": {"type": "string", "pattern": "^[0-9]+$"},
+          "doi": {"type": "string", "pattern": "^10\\.[0-9]{4,9}/\\S+$"},
+          "source_type": {"type": "string", "enum": ["uploaded", "retrieved"]},
+          "required": {"type": "boolean", "description": "true if the researcher said this paper must be cited"},
+          "required_note": {"type": "string", "description": "Why a required paper contributed no candidate (e.g. no adjustment set reported)"},
+          "access_level": {"type": "string", "enum": ["full_text", "abstract", "metadata", "uploaded_full_text"]},
+          "verification_status": {"type": "string", "enum": ["verified", "unverified", "mismatch", "not_found", "not_applicable"]},
+          "verified_via": {"type": "string", "enum": ["pubmed", "crossref", "publisher_page", "manual"]},
+          "verified_on": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"}
+        }
+      }
+    },
+    "candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["variable", "measurement_timing", "role", "recommendation", "rationale", "evidence"],
+        "properties": {
+          "variable": {"type": "string", "minLength": 1},
+          "definition": {"type": "string"},
+          "measurement_timing": {"type": "string", "enum": ["pre_exposure", "post_exposure", "time_varying", "unclear"]},
+          "role": {"type": "string", "enum": ["candidate confounder", "proxy for unmeasured confounder", "possible mediator", "possible collider/selection variable", "possible instrument", "precision variable", "uncertain", "not recommended for primary adjustment"]},
+          "recommendation": {"type": "string", "enum": ["adjust", "do_not_adjust", "sensitivity_only", "undecided"]},
+          "rationale": {"type": "string", "minLength": 1},
+          "researcher_proposed": {"type": "boolean", "description": "true if the researcher suggested this variable and no literature was found"},
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["paper_id", "support_type", "location", "finding"],
+              "properties": {
+                "paper_id": {"type": "string", "minLength": 1},
+                "support_type": {"type": "string", "enum": ["adjusted_in_model", "causes_exposure", "causes_outcome", "associated_with_exposure", "associated_with_outcome", "mediator_evidence", "counterevidence"]},
+                "location": {"type": "string", "minLength": 1, "description": "e.g. 'Table 2 footnote', 'Methods, Statistical analysis', 'Abstract'"},
+                "finding": {"type": "string", "minLength": 1, "description": "What the paper reports, paraphrased"},
+                "quote": {"type": "string", "description": "Optional short verbatim snippet (<= 40 words) supporting the finding"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "dag": {
+      "type": "object",
+      "required": ["exposure", "outcome", "edges"],
+      "properties": {
+        "exposure": {"type": "string", "minLength": 1},
+        "outcome": {"type": "string", "minLength": 1},
+        "edges": {"type": "array", "items": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "string", "minLength": 1}}},
+        "latent": {"type": "array", "items": {"type": "string"}},
+        "edge_sources": {"type": "object", "additionalProperties": {"type": "array", "items": {"type": "string"}}, "description": "Map 'A->B' to paper ids that justify the edge"}
+      }
+    }
   }
 }

@@ -1,21 +1,35 @@
-# Required detailed report format
+# Report format
 
-## 1. Research question
-Population; exposure/comparator; outcome/time window; observational design; estimand; time zero; assumptions and missing inputs.
+## 1. Summary: recommended confounders and where they came from
+Put this first. One row per variable. Name the paper in "Suggested by" (first author + year, with a reference number), not just a number.
 
-## 2. Search and source coverage
-Search date, PubMed queries, filters, supplemental scholarly sources; uploaded mandatory papers read/not accessible; abstract vs full-text access; search limitations.
-
-## 3. Evidence-backed candidate table
-| Variable (definition and measurement time) | Evidence on exposure | Evidence on outcome | Sources (PMID/DOI or uploaded page) | Causal role and alternative DAG | Recommendation and confidence |
+| # | Variable (timing) | Suggested by | What the source shows | Role | Adjust? |
 |---|---|---|---|---|---|
-Use one row per variable; attach references to **specific claims**, not merely to the row. `Confidence` describes evidence and causal assumptions, not a numerical probability.
+| 1 | Age (baseline) | Uploaded study [U1]; Smith 2019 [3] | [U1] adjusted for age (Table 2); [3] activity declines with age | Candidate confounder | ✅ Yes |
+| 2 | BMI (follow-up) | Lee 2021 [5] | Adjusted in model; [7] BMI partly mediates exercise → BP | Possible mediator | ❌ No (total effect) — sensitivity only |
+| 3 | Household income | Researcher-proposed | No literature support found | Uncertain | ⚠️ Researcher decision |
 
-## 4. Adjustment recommendation
-Provisional baseline set, variables to exclude from total-effect model, disputed variables, and conditional alternatives; explicitly state when no minimally sufficient set can be established.
+*The rows above illustrate the format only; they are not real findings.*
 
-## 5. Sensitivity and implementation
-At least one feasible sensitivity analysis; address missing data, positivity, selection, and exposure/outcome measurement as relevant.
+Then give the **recommended adjustment set** in one line, plus DAGitty's minimal sufficient set(s) if they differ.
 
-## 6. References and audit trail
-Numbered bibliography with accurate title, authors, year, journal, DOI/PMID when verified, source type `uploaded/retrieved`, and access/verification status. Include brief evidence-to-claim mapping and unresolved verification issues.
+## 2. Research question and assumptions
+Population; exposure/comparator; outcome and window; design; time zero; estimand; assumptions made because inputs were missing.
+
+## 3. Required papers
+For each required paper: citation, what it contributed (variables), or why it contributed nothing.
+
+## 4. Search and verification log
+Date, source and query for each search, with purpose and result count. Verification method per paper (PubMed / Crossref / manual) and any papers dropped for failing verification.
+
+## 5. Variable-by-variable evidence
+For each variable: definition and measurement timing; evidence linking it to the exposure; evidence linking it to the outcome; counterevidence; causal role with alternative DAG readings; recommendation and confidence (in words, not a probability). Attach each citation to a specific claim.
+
+## 6. DAG
+DAGitty code (from `scripts/dag_tools.py`), the papers justifying key edges, minimal sufficient adjustment sets, and whether the proposed set is sufficient under this DAG. If the DAG is uncertain, also report the set given by the modified disjunctive cause criterion.
+
+## 7. Sensitivity analyses and limitations
+At least one feasible sensitivity analysis, for example: adding or removing disputed variables, an E-value for unmeasured confounding, or a negative-control outcome. Note missingness, positivity, measurement and selection issues.
+
+## 8. References
+A numbered list with authors, year, title, journal, PMID/DOI. Mark each as uploaded or retrieved and give its verification status. Never list a reference you did not open or verify without marking it `unverified`.

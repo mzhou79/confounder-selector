@@ -1,39 +1,62 @@
-# Confounder Selector v1.0
+# Confounder Selector v2.0
 
-A ChatGPT Skill for **evidence-grounded candidate confounder selection** in observational epidemiology. Research decision support only; does not replace domain expertise or prove causal identification.
+An agent skill (open Agent Skills / `SKILL.md` format) for **literature-grounded confounder selection** in observational epidemiology. You give it a target population, exposure(s), outcome(s) and the papers you must cite. It returns candidate confounders, each traced to the specific real paper that suggested it, classified by causal role and checked against a DAG.
 
-## Capabilities
-- Inputs: target population, exposure, outcome, observational design, estimand/time zero, uploaded required papers.
-- Uses uploaded papers **and** PubMed-first literature searches when search tools are available.
-- Separates evidence of prior covariate adjustment from causal evidence of confounding.
-- Produces detailed variable evidence table, provisional adjustment set, exclusions, sensitivity analyses, and audit trail.
-- Includes an optional offline JSON evidence-ledger validator (structure/identifiers only; **not** an online citation truth checker).
+Research decision support only; it does not replace domain expertise or prove causal identification.
 
-## Install
-1. Download `skill.zip` from the release/artifact package.
-2. Open ChatGPT Skills (`/skills`) and upload the archive where supported by your plan/workspace.
-3. Prompt: "Use Confounder Selector for a cohort study of daily exercise and systolic blood pressure among adults. Here are my required papers..."
-4. Confirm the workspace permits web research and file access; if not, the Skill must explicitly report those limitations.
+## What's new in v2
+- **Provenance is enforced, not just requested.** The validator rejects any recommended confounder that lacks support from an uploaded or verified paper, any citation to a paper that failed verification, uncited required papers, and post-exposure adjustment for a total effect.
+- **Real citation checking.** `scripts/verify_citations.py` looks up every PMID in PubMed (E-utilities) and every DOI in Crossref, and requires the title to match. Fabricated or mismatched identifiers come back as `not_found` / `mismatch`.
+- **Seed → expand → corroborate workflow.** Start from the adjustment sets in your required papers, harvest adjustment sets from prior studies of the same exposure and outcome, then run targeted searches for each candidate's links to the exposure and to the outcome.
+- **Claim-level evidence.** Each variable–paper link records what the paper shows (adjusted in model vs. causes/associated with exposure or outcome vs. mediator evidence), where (table/section), and a short finding.
+- **Summary table first.** The report opens with a table: Variable | Suggested by | What the source shows | Role | Adjust?
+- **DAG tooling.** `scripts/dag_tools.py` emits DAGitty code, enumerates minimal sufficient adjustment sets (back-door criterion), and checks the proposed set. The guidelines add VanderWeele's (2019) modified disjunctive cause criterion for use when the DAG is uncertain.
+- The schema is now the single source of truth (the validator reads `evidence-schema.json`; uses `jsonschema` if installed, with a built-in fallback).
 
-## Test locally
-```bash
-python -m unittest discover -s confounder-selector/tests -v
-python confounder-selector/scripts/validate_evidence.py path/to/ledger.json
+## Layout
+```
+SKILL.md                         workflow and rules the model follows
+references/causal-guidelines.md  causal roles, disjunctive cause criterion
+references/literature-protocol.md search, evidence recording, verification rules
+references/output-template.md    report format (summary table first)
+references/evidence-schema.json  ledger schema (v2.0)
+scripts/verify_citations.py      PubMed/Crossref lookup (needs network)
+scripts/validate_evidence.py     structure + provenance checks (offline)
+scripts/dag_tools.py             DAGitty export + adjustment sets (offline)
+tests/                           unit tests (no network needed)
 ```
 
-## GitHub publication
-Commit this repository, excluding patient data, copyrighted PDFs without permission, secrets, and private university materials. Publish `skill.zip` as a release asset. A public GitHub repository **does not automatically install** a Skill in a university ChatGPT workspace; consult university ChatGPT administrators about workspace installation, distribution, review, and permissions.
+## Install
+
+**ChatGPT.** Zip the folder so that `SKILL.md` is at the top level of the zip:
+```bash
+zip -r confounder-selector.zip SKILL.md references scripts agents LICENSE
+```
+Then go to Skills → Create → Upload from your computer. On a university workspace, the workspace owner controls who can install and share skills.
+
+ChatGPT's code sandbox may not be able to reach PubMed. In that case the skill falls back to manual verification through browsing. For reliable live retrieval, pair it with a PubMed connector (MCP server), e.g. by packaging the skill as a plugin that bundles the connector.
+
+**Claude.** Upload the same zip under Customize → Skills (Claude.ai), or copy the folder to `~/.claude/skills/confounder-selector/` (Claude Code). Enable web search or a PubMed connector for retrieval.
+
+**Codex / other agents.** Place the folder wherever the agent discovers skills; `agents/openai.yaml` supplies display metadata.
+
+## Use
+> Use Confounder Selector. Population: adults 40–75 without hypertension. Exposure: exercise ≥30 min/day vs less. Outcome: systolic BP at 5 years. Cohort, total effect, time zero = baseline. Required paper attached.
+
+## Scripts
+```bash
+python scripts/verify_citations.py ledger.json --write ledger.json   # needs network
+python scripts/validate_evidence.py ledger.json [--strict]
+python scripts/dag_tools.py ledger.json
+python -m unittest discover -s tests -v
+```
+`NCBI_API_KEY` (optional) raises the PubMed rate limit; `CONTACT_EMAIL` identifies you to NCBI/Crossref.
 
 ## Validation boundaries
-The unit tests check only deterministic validation behavior. Real-world evaluation requires blinded expert review of causal-role decisions, verification of every cited PMID/DOI, checking evidence-to-claim support, and testing failure cases (inaccessible PDFs, ambiguous timing, mediators, colliders, no search access).
+`verify_citations.py` confirms that a paper exists and matches its title. It does **not** confirm that the paper supports the claim attributed to it; that still needs a human to read the paper. Real-world evaluation needs blinded expert review of role decisions and test cases such as: inaccessible PDFs, ambiguous timing, mediators (post-baseline BMI), colliders/selection (study participation), uploaded papers without PMIDs, no network access, and contradictory evidence.
 
-## Suggested evaluation cases
-1. Baseline age as a plausible common cause, but require actual evidence and DAG justification.
-2. BMI measured after exercise initiation: possible mediator, do not automatically adjust for total effect.
-3. Conditioning on study participation: investigate collider/selection bias.
-4. Uploaded paper has no PMID: cite upload location without inventing identifiers.
-5. No internet/search: disclose missing retrieval and do not claim a systematic search.
-6. Contradictory evidence: report uncertainty and alternative DAGs.
+## Publishing
+Don't commit patient data, copyrighted PDFs, secrets or private university materials. Attach `confounder-selector.zip` to a GitHub release for easy installation.
 
 ## License
 MIT; see LICENSE.
