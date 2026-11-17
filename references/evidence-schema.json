@@ -1,0 +1,10 @@
+{
+  "type": "object",
+  "required": ["question", "search_log", "papers", "candidates"],
+  "properties": {
+    "question": {"type": "string", "minLength": 5},
+    "search_log": {"type": "array", "items": {"type": "object", "required": ["source", "query", "date"], "properties": {"source": {"type": "string"}, "query": {"type": "string"}, "date": {"type": "string"}}}},
+    "papers": {"type": "array", "items": {"type": "object", "required": ["id", "title", "source_type", "access_level", "verification_status"], "properties": {"id": {"type": "string"}, "title": {"type": "string", "minLength": 1}, "source_type": {"enum": ["uploaded", "retrieved"]}, "access_level": {"enum": ["full_text", "abstract", "metadata", "uploaded_full_text"]}, "verification_status": {"enum": ["verified", "unverified", "not_applicable"]}, "pmid": {"type": "string", "pattern": "^[0-9]+$"}, "doi": {"type": "string", "minLength": 3}}}},
+    "candidates": {"type": "array", "items": {"type": "object", "required": ["variable", "role", "rationale", "paper_ids", "recommendation"], "properties": {"variable": {"type": "string", "minLength": 1}, "role": {"enum": ["candidate confounder", "possible mediator", "possible collider/selection variable", "precision variable", "uncertain", "not recommended for primary adjustment"]}, "rationale": {"type": "string", "minLength": 1}, "paper_ids": {"type": "array", "items": {"type": "string"}}, "recommendation": {"type": "string", "minLength": 1}}}}
+  }
+}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Confounder Selector"
+  short_description: "Evidence-grounded confounder assessment for observational studies"
+  default_prompt: "Help me identify potential confounders for an observational epidemiology study using my uploaded papers and PubMed research."
