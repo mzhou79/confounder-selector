@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Confounder Selector</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* VOICE: clinical, careful, like a methods section a reviewer trusts.
+   IDEA: a causal diagram on a journal page; the form is the study protocol, the result is the methods appendix.
+   PICTURE: the protocol form itself, then the drawn DAG of the answer.
+   COLOUR and TYPE: white page, ink, cobalt for exposure->outcome, coral for "do not adjust"; Source Serif 4 heads, Inter text.
+   LAYOUT: one calm column for the form; report widens to 1100px with a summary table first. */
+:root{color-scheme:light dark;--bg:light-dark(#ffffff,#0e1116);--ink:light-dark(#141a22,#e7eaf0);--mut:light-dark(#5b6573,#9aa4b2);--line:light-dark(#dfe3ea,#262c36);--soft:light-dark(#f4f6fa,#151a22);--co:light-dark(#2343c8,#7f95ff);--cos:light-dark(#e8ecfc,#1a2142);--cr:light-dark(#d2452f,#ff8b78);--crs:light-dark(#fdece8,#3a1d18);--ok:light-dark(#1d7a4c,#6fd3a0);--oks:light-dark(#e6f4ec,#14271d);--am:light-dark(#9a6200,#f0b44c);--ams:light-dark(#fff4dd,#2e2412)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 Inter,system-ui,sans-serif;overflow-x:clip}
+h1,h2,h3{font-family:"Source Serif 4",Georgia,serif;line-height:1.1;text-wrap:balance;margin:0}
+h1{font-size:clamp(32px,5vw,46px)}h2{font-size:28px;margin-bottom:14px}h3{font-size:19px;margin:0 0 6px}
+a{color:var(--co)}
+.band{padding:clamp(28px,4vw,56px) max(5vw,16px)}
+.wrap{max-width:1100px;margin:0 auto}.narrow{max-width:760px;margin:0 auto}
+.lede{color:var(--mut);font-size:17px;max-width:62ch;margin:12px 0 0}
+.head{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:28px;align-items:end;max-width:1100px;margin:0 auto}
+.head svg{width:100%;height:auto}
+form{display:grid;gap:18px;margin-top:22px}
+label{font-weight:600;display:block;margin-bottom:6px}
+.hint{font-weight:400;color:var(--mut);font-size:14px}
+input[type=text],textarea,select{width:100%;font:16px/1.45 Inter,system-ui,sans-serif;color:var(--ink);background:var(--bg);border:1.5px solid var(--line);border-radius:10px;padding:12px 14px}
+textarea{min-height:88px;resize:vertical}
+input:focus-visible,textarea:focus-visible,select:focus-visible,button:focus-visible,summary:focus-visible,.drop:focus-within{outline:3px solid var(--co);outline-offset:2px}
+.drop{border:1.5px dashed var(--line);border-radius:12px;padding:18px;background:var(--soft);text-align:center;cursor:pointer}
+.drop.over{border-color:var(--co);background:var(--cos)}
+.drop input{position:absolute;opacity:0;width:1px;height:1px}
+.files{list-style:none;padding:0;margin:10px 0 0;display:grid;gap:6px;text-align:left}
+.files li{display:flex;gap:10px;align-items:center;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:14px}
+.files li span{flex:1;overflow-wrap:anywhere}
+.x{border:0;background:none;color:var(--mut);font-size:20px;min-width:44px;min-height:44px;cursor:pointer}
+details.adv{border:1px solid var(--line);border-radius:12px;padding:4px 16px}
+details.adv summary{cursor:pointer;font-weight:600;min-height:44px;display:flex;align-items:center}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;padding-bottom:14px}
+.btn{font:600 16px Inter,sans-serif;border:0;border-radius:10px;padding:14px 22px;min-height:48px;cursor:pointer;background:var(--co);color:#fff}
+.btn[disabled]{opacity:.55;cursor:progress}
+.btn.ghost{background:var(--cos);color:var(--co)}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.note{font-size:14px;color:var(--mut)}
+.banner{border-radius:10px;padding:12px 14px;font-size:15px;margin-top:14px}
+.banner.warn{background:var(--ams);color:var(--am)}.banner.err{background:var(--crs);color:var(--cr)}.banner.info{background:var(--cos);color:var(--co)}
+.steps{list-style:none;padding:0;margin:18px 0 0;display:grid;gap:8px}
+.steps li{display:grid;grid-template-columns:28px minmax(0,1fr);gap:8px;align-items:start;font-size:15px}
+.steps li i{font-style:normal;display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;border:2px solid var(--line);font-size:12px;margin-top:1px}
+.steps li.run i{border-color:var(--co);border-top-color:transparent;animation:sp 1s linear infinite}
+.steps li.done i{background:var(--ok);border-color:var(--ok);color:#fff}
+.steps li.fail i{background:var(--cr);border-color:var(--cr);color:#fff}
+.steps small{display:block;color:var(--mut)}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.steps li.run i{animation:none}}
+.verdict{background:var(--cos);border-radius:14px;padding:clamp(18px,3vw,28px);margin-bottom:26px}
+.verdict p{margin:8px 0 0;font-size:17px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.chip{border-radius:999px;padding:6px 12px;font-size:14px;font-weight:600;background:var(--bg);border:1.5px solid var(--co);color:var(--co)}
+.chip.no{border-color:var(--cr);color:var(--cr)}.chip.maybe{border-color:var(--am);color:var(--am)}
+section.part{margin-top:38px}
+table{width:100%;border-collapse:collapse;font-size:15px}
+th,td{text-align:left;vertical-align:top;padding:10px 10px;border-bottom:1px solid var(--line)}
+th{font-size:13px;color:var(--mut);font-weight:600}
+td b{font-weight:600}
+.tag{display:inline-block;border-radius:6px;padding:2px 8px;font-size:13px;font-weight:600;white-space:nowrap}
+.tag.y{background:var(--oks);color:var(--ok)}.tag.n{background:var(--crs);color:var(--cr)}.tag.m{background:var(--ams);color:var(--am)}
+.ref{font-size:13px;color:var(--co);text-decoration:none;font-weight:600}
+.fig{position:relative;min-height:380px;border:1px solid var(--line);border-radius:14px;background:var(--soft)}
+.fig>svg{position:absolute;inset:0;width:100%;height:100%}
+pre{overflow-x:auto;background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:14px;font-size:13.5px;line-height:1.5;margin:10px 0}
+.cols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px}
+ul.plain{padding-left:20px;margin:6px 0}ul.plain li{margin:4px 0}
+details.var{border-top:1px solid var(--line);padding:10px 0}
+details.var summary{cursor:pointer;font-weight:600;min-height:40px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+ol.refs{padding-left:24px}ol.refs li{margin:8px 0;font-size:15px}
+.scroll{overflow-x:auto}
+.foot{color:var(--mut);font-size:14px;border-top:1px solid var(--line);margin-top:48px;padding-top:18px}
+[hidden]{display:none!important}
+@media(max-width:760px){.head{grid-template-columns:1fr}.head svg{max-width:300px}.grid3,.cols{grid-template-columns:1fr}}
+@media(max-width:600px){table{font-size:13px}.stack thead{display:none}.stack tr{display:grid;padding-block:10px;border-bottom:1px solid var(--line)}.stack td{display:flow-root;border:0;padding:3px 0;padding-inline-start:8em;text-align:start}.stack td::before{content:attr(data-l);float:inline-start;width:7.5em;margin-inline-start:-8em;white-space:normal;color:var(--mut);font-size:12px}.stack td:empty{display:none}}
+</style>
+<script>new MutationObserver(()=>{for(const c of document.querySelectorAll('.stack td:not([data-l])')){let i=0,p=c;while(p=p.previousElementSibling)i+=p.colSpan;c.dataset.l=c.closest('table').rows[0].cells[i]?.textContent||''}}).observe(document,{childList:true,subtree:true})</script>
+</head>
+<body>
+<header class="band">
+  <div class="head">
+    <div>
+      <h1>Confounder Selector</h1>
+      <p class="lede">Describe your study. The tool searches PubMed, reads the papers you must cite, and proposes confounders, with each one traced to the specific real papers that suggest it.</p>
+    </div>
+    <svg viewBox="0 0 260 150" role="img" aria-label="Diagram: a confounder C points to both exposure X and outcome Y">
+      <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>
+      <g fill="none" stroke-width="2.2" style="color:var(--mut)"><path d="M118 40 L52 104" stroke="currentColor" marker-end="url(#ah)"/><path d="M142 40 L208 104" stroke="currentColor" marker-end="url(#ah)"/></g>
+      <path d="M64 120 L196 120" stroke="var(--co)" stroke-width="3" marker-end="url(#ah)" style="color:var(--co)"/>
+      <circle cx="130" cy="28" r="20" fill="var(--bg)" stroke="var(--mut)" stroke-width="2"/><text x="130" y="34" text-anchor="middle" font-family="Source Serif 4,serif" font-size="17" font-weight="700" fill="var(--ink)">C</text>
+      <circle cx="40" cy="120" r="20" fill="var(--co)"/><text x="40" y="126" text-anchor="middle" font-family="Source Serif 4,serif" font-size="17" font-weight="700" fill="#fff">X</text>
+      <circle cx="220" cy="120" r="20" fill="var(--ink)"/><text x="220" y="126" text-anchor="middle" font-family="Source Serif 4,serif" font-size="17" font-weight="700" fill="var(--bg)">Y</text>
+    </svg>
+  </div>
+</header>
+
+<main>
+<section class="band" style="padding-top:0">
+  <div class="narrow">
+    <form id="f" novalidate>
+      <div><label for="pop">1. Target population</label><textarea id="pop" placeholder="e.g. Adults aged 40–75 without hypertension at baseline, US community cohorts" required></textarea></div>
+      <div><label for="exp">2. Exposure(s) of interest <span class="hint">and comparator, if any</span></label><textarea id="exp" placeholder="e.g. Exercise ≥30 minutes per day (vs. <30 minutes)" required></textarea></div>
+      <div><label for="out">3. Outcome(s) of interest</label><textarea id="out" placeholder="e.g. Systolic blood pressure at 5-year follow-up" required></textarea></div>
+      <div>
+        <label>4. Papers you must cite <span class="hint">(optional; PDF or text, read in your browser)</span></label>
+        <div class="drop" id="drop" tabindex="-1">
+          <input type="file" id="file" multiple accept=".pdf,.txt,.md,application/pdf,text/plain">
+          <div><b>Drop files here</b> or <button type="button" class="btn ghost" id="pick" style="padding:8px 14px;min-height:44px">choose files</button></div>
+          <ul class="files" id="files"></ul>
+        </div>
+        <input type="text" id="ids" style="margin-top:10px" placeholder="…or list their PMIDs / DOIs, separated by commas" aria-label="Required papers by PMID or DOI">
+      </div>
+      <div><label for="com">5. Additional comments <span class="hint">background, data source, variables you have, anything the agent should know</span></label><textarea id="com" placeholder="e.g. We use NHANES-linked cohort data; diet is measured by a single 24-hour recall; we want the total effect."></textarea></div>
+      <details class="adv"><summary>Advanced: design, estimand, time zero</summary>
+        <div class="grid3">
+          <div><label for="des">Design</label><select id="des"><option value="unspecified">Let the agent infer</option><option value="cohort">Cohort</option><option value="case-control">Case-control</option><option value="cross-sectional">Cross-sectional</option><option value="case-crossover">Case-crossover</option><option value="other">Other</option></select></div>
+          <div><label for="est">Estimand</label><select id="est"><option value="unspecified">Let the agent infer</option><option value="total_effect">Total effect</option><option value="direct_effect">Direct effect</option></select></div>
+          <div><label for="tz">Time zero</label><input type="text" id="tz" placeholder="e.g. baseline visit"></div>
+        </div>
+      </details>
+      <div class="row"><button class="btn" id="go" type="submit">Find confounders</button><span class="note" id="cost">Takes 3–6 minutes. Uses your Claude usage and the PubMed connector.</span></div>
+      <div id="cap" class="banner info" hidden></div>
+    </form>
+    <ol class="steps" id="steps" hidden></ol>
+    <div id="err" class="banner err" hidden></div>
+  </div>
+</section>
+
+<section class="band" id="report" hidden style="border-top:1px solid var(--line)">
+  <div class="wrap" id="rep"></div>
+</section>
+</main>
+
+<footer class="band" style="padding-top:0"><div class="wrap foot">Decision support for researchers, not a substitute for subject-matter judgment. Literature is retrieved from PubMed through the PubMed connector; every retrieved citation is fetched by PMID, so it exists, but check that each paper supports its claim. Source: <a href="https://github.com/mzhou79/confounder-selector">github.com/mzhou79/confounder-selector</a>.</div></footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+<script>
+/*CORE-START*/
+const ROLES=["candidate confounder","proxy for unmeasured confounder","possible mediator","possible collider/selection variable","possible instrument","precision variable","uncertain","not recommended for primary adjustment"];
+const RECS=["adjust","do_not_adjust","sensitivity_only","undecided"];
+const SUPPORT=["adjusted_in_model","causes_exposure","causes_outcome","associated_with_exposure","associated_with_outcome","mediator_evidence","counterevidence"];
+const TIMING=["pre_exposure","post_exposure","time_varying","unclear"];
+const ADJ_RE=/\b(adjust|controll?(ed|ing)? for|covariat|confound|multivariabl|multivariat|accounted for)/i;
+function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function adjustmentSentences(text,cap=2500){
+  const out=[],seen=new Set();let n=0;
+  for(const s of String(text||"").replace(/\s+/g," ").split(/(?<=[.;])\s+(?=[A-Z(])/)){
+    if(s.length<25||s.length>600||!ADJ_RE.test(s))continue;
+    const k=s.slice(0,80);if(seen.has(k))continue;seen.add(k);
+    if(n+s.length>cap)break;out.push(s);n+=s.length;
+  }
+  return out.join(" ");
+}
+function parseIds(str){
+  const pmids=[],dois=[];
+  for(const t of String(str||"").split(/[\s,;]+/)){
+    const d=t.replace(/^https?:\/\/(dx\.)?doi\.org\//i,"").replace(/^doi:/i,"");
+    if(/^\d{4,9}$/.test(t))pmids.push(t);else if(/^10\.\d{4,9}\/\S+$/.test(d))dois.push(d);
+  }
+  return{pmids:[...new Set(pmids)],dois:[...new Set(dois)]};
+}
+function pickEnum(v,list,dflt){return list.includes(v)?v:dflt}
+function normVar(s){return String(s||"").trim().toLowerCase()}
+
+/* Build ledger v2.0 from page-held facts + model output. Papers come only from PubMed records the page fetched, or uploads. */
+function buildLedger({question,searchLog,pubmed,uploads,requiredPmids,model,today}){
+  const papers=[];
+  for(const u of uploads)papers.push({id:u.id,title:u.title||u.name,source_type:"uploaded",required:true,access_level:"uploaded_full_text",verification_status:"not_applicable",file:u.name});
+  for(const [pmid,r] of Object.entries(pubmed)){
+    const p={id:pmid,title:r.title,pmid,source_type:"retrieved",required:requiredPmids.includes(pmid),access_level:r.fullText?"full_text":(r.abstract?"abstract":"metadata"),verification_status:"verified",verified_via:"pubmed",verified_on:today};
+    if(r.doi)p.doi=r.doi;if(r.year)p.year=r.year;if(r.journal)p.journal=r.journal;if(r.firstAuthor)p.first_author=r.firstAuthor;
+    papers.push(p);
+  }
+  const ids=new Set(papers.map(p=>p.id));
+  const dropped=[];const cands=[];const seen=new Map();
+  for(const c of (model.candidates||[])){
+    const name=String(c.variable||"").trim();if(!name)continue;
+    const ev=[];
+    for(const e of (c.evidence||[])){
+      const pid=String(e.paper_id||"").trim();
+      if(!ids.has(pid)){dropped.push({variable:name,paper_id:pid,finding:e.finding||""});continue}
+      ev.push({paper_id:pid,support_type:pickEnum(e.support_type,SUPPORT,"associated_with_outcome"),location:String(e.location||"Abstract"),finding:String(e.finding||""),...(e.quote?{quote:String(e.quote)}:{})});
+    }
+    const obj={variable:name,definition:String(c.definition||""),measurement_timing:pickEnum(c.measurement_timing,TIMING,"unclear"),role:pickEnum(c.role,ROLES,"uncertain"),recommendation:pickEnum(c.recommendation,RECS,"undecided"),rationale:String(c.rationale||"No rationale given."),researcher_proposed:!!c.researcher_proposed,evidence:ev};
+    const k=normVar(name);
+    if(seen.has(k)){seen.get(k).evidence.push(...ev);continue}
+    seen.set(k,obj);cands.push(obj);
+  }
+  const used=new Set(cands.flatMap(c=>c.evidence.map(e=>e.paper_id)));
+  const ledger={schema_version:"2.0",question,search_log:searchLog,papers:papers.filter(p=>used.has(p.id)||p.required||(model.dag&&Object.values(model.dag.edge_sources||{}).flat().includes(p.id))),candidates:cands};
+  for(const p of ledger.papers){const n=(model.required_notes||{})[p.id];if(p.required&&n)p.required_note=String(n)}
+  if(model.dag&&model.dag.exposure&&model.dag.outcome&&Array.isArray(model.dag.edges)){
+    const es={};for(const [k,v] of Object.entries(model.dag.edge_sources||{}))es[k]=(v||[]).map(String).filter(x=>ids.has(x));
+    ledger.dag={exposure:String(model.dag.exposure),outcome:String(model.dag.outcome),edges:model.dag.edges.filter(e=>Array.isArray(e)&&e.length===2).map(e=>[String(e[0]),String(e[1])]),latent:(model.dag.latent||[]).map(String),edge_sources:es};
+  }
+  return{ledger,dropped};
+}
+
+/* Same provenance rules as scripts/validate_evidence.py */
+function validateLedger(d){
+  const errors=[],warnings=[];const papers={};
+  for(const p of d.papers){papers[p.id]=p;if(p.source_type==="retrieved"&&p.verification_status==="unverified")warnings.push(`Paper ${p.id} is unverified.`)}
+  if(d.papers.some(p=>p.source_type==="retrieved")&&!d.search_log.length)errors.push("Retrieved papers present but no searches were logged.");
+  const est=d.question.estimand;const cited=new Set();
+  for(const c of d.candidates){
+    const trusted=[],types=new Set();
+    for(const e of c.evidence){cited.add(e.paper_id);const p=papers[e.paper_id];if(!p){errors.push(`${c.variable}: unknown paper ${e.paper_id}.`);continue}
+      if(["mismatch","not_found"].includes(p.verification_status))errors.push(`${c.variable}: cites a paper that failed verification.`);
+      if(p.source_type==="uploaded"||p.verification_status==="verified"){trusted.push(p.id);types.add(e.support_type)}
+      if(e.quote&&e.quote.split(/\s+/).length>40)warnings.push(`${c.variable}: a quote exceeds 40 words.`)}
+    const needs=["adjust","sensitivity_only"].includes(c.recommendation)||["candidate confounder","proxy for unmeasured confounder"].includes(c.role);
+    if(needs&&!trusted.length){if(c.researcher_proposed)warnings.push(`${c.variable}: researcher-proposed, no literature support found.`);else errors.push(`${c.variable}: recommended or classified as a confounder with no paper behind it.`)}
+    if(c.role==="candidate confounder"&&trusted.length&&!["causes_exposure","causes_outcome","associated_with_exposure","associated_with_outcome"].some(t=>types.has(t)))warnings.push(`${c.variable}: only evidence is that other studies adjusted for it.`);
+    if(est==="total_effect"&&c.recommendation==="adjust"&&c.measurement_timing==="post_exposure")errors.push(`${c.variable}: measured after exposure but recommended for adjustment of a total effect.`);
+  }
+  for(const p of d.papers)if(p.required&&!cited.has(p.id)&&!(p.required_note||"").trim())errors.push(`Required paper ${p.title||p.id} is not cited and has no note.`);
+  if(d.dag){const nodes=new Set(d.dag.edges.flat());for(const c of d.candidates)if(c.recommendation==="adjust"&&!nodes.has(c.variable))warnings.push(`${c.variable} is recommended but not in the DAG.`)}
+  return{errors,warnings};
+}
+/* Enforce rather than just report: anything recommended without a paper is demoted. */
+function enforce(d){
+  const fixes=[];const papers=Object.fromEntries(d.papers.map(p=>[p.id,p]));
+  for(const c of d.candidates){
+    const trusted=c.evidence.some(e=>{const p=papers[e.paper_id];return p&&(p.source_type==="uploaded"||p.verification_status==="verified")});
+    if(["adjust","sensitivity_only"].includes(c.recommendation)&&!trusted&&!c.researcher_proposed){fixes.push(`${c.variable}: no supporting paper, moved from "${c.recommendation}" to "undecided".`);c.recommendation="undecided";if(c.role==="candidate confounder")c.role="uncertain"}
+    if(d.question.estimand==="total_effect"&&c.recommendation==="adjust"&&c.measurement_timing==="post_exposure"){fixes.push(`${c.variable}: post-exposure, moved to sensitivity analysis only.`);c.recommendation="sensitivity_only"}
+  }
+  return fixes;
+}
+
+/* DAG: back-door criterion, same as scripts/dag_tools.py */
+function makeDag(edges,latent=[]){
+  const par={},ch={};for(const[a,b]of edges){for(const n of[a,b]){par[n]??=new Set();ch[n]??=new Set()}par[b].add(a);ch[a].add(b)}
+  const nodes=new Set(Object.keys(par));
+  const st={};let cyc=false;const vis=n=>{st[n]=1;for(const c of ch[n]){if(st[c]===1)cyc=true;else if(!st[c])vis(c)}st[n]=2};for(const n of nodes)if(!st[n])vis(n);
+  if(cyc)throw new Error("The DAG contains a cycle.");
+  const desc=x=>{const s=new Set(),t=[x];while(t.length){for(const c of ch[t.pop()]||[])if(!s.has(c)){s.add(c);t.push(c)}}return s};
+  const dsep=(x,y,z,drop)=>{const P={};for(const n of nodes)P[n]=new Set(par[n]);if(drop)for(const c of ch[drop])P[c].delete(drop);
+    const anc=new Set([x,y,...z]),t=[x,y,...z];while(t.length){for(const p of P[t.pop()])if(!anc.has(p)){anc.add(p);t.push(p)}}
+    const U={};for(const n of anc)U[n]=new Set();for(const n of anc){const ps=[...P[n]].filter(p=>anc.has(p));for(const p of ps){U[n].add(p);U[p].add(n)}for(let i=0;i<ps.length;i++)for(let j=i+1;j<ps.length;j++){U[ps[i]].add(ps[j]);U[ps[j]].add(ps[i])}}
+    const zz=new Set(z),seen=new Set([x]),q=[x];while(q.length){const n=q.pop();if(n===y)return false;for(const m of U[n])if(!seen.has(m)&&!zz.has(m)){seen.add(m);q.push(m)}}return true};
+  const backdoor=(x,y,z)=>{const D=desc(x);if([...z].some(v=>D.has(v)))return false;return dsep(x,y,[...z],x)};
+  const minimal=(x,y,maxSize=6)=>{const L=new Set(latent),D=desc(x);const pool=[...nodes].filter(n=>n!==x&&n!==y&&!L.has(n)&&!D.has(n)).sort();const found=[];
+    const k=Math.min(maxSize,pool.length);const rec=(start,size,cur)=>{if(cur.length===size){if(found.some(f=>f.every(v=>cur.includes(v))))return;if(backdoor(x,y,cur))found.push([...cur]);return}for(let i=start;i<pool.length;i++){cur.push(pool[i]);rec(i+1,size,cur);cur.pop()}};
+    for(let s=0;s<=k;s++)rec(0,s,[]);return{sets:found,truncated:pool.length>maxSize}};
+  return{nodes,par,ch,desc,backdoor,minimal};
+}
+function ident(n){const s=String(n).replace(/[^A-Za-z0-9_]/g,"_");return/^[A-Za-z_]/.test(s)?s:"v_"+s}
+function toDagitty(dag){const L=new Set(dag.latent||[]);const nodes=[...new Set([...dag.edges.flat(),dag.exposure,dag.outcome])].sort();
+  return["dag {",...nodes.map(n=>"  "+ident(n)+(n===dag.exposure?" [exposure]":n===dag.outcome?" [outcome]":L.has(n)?" [latent]":"")),...dag.edges.map(([a,b])=>`  ${ident(a)} -> ${ident(b)}`),"}"].join("\n")}
+function analyzeDag(ledger){
+  const d=ledger.dag;if(!d)return null;
+  try{const g=makeDag(d.edges,d.latent);if(!g.nodes.has(d.exposure)||!g.nodes.has(d.outcome))return{error:"Exposure or outcome is not in the DAG."};
+    const prop=ledger.candidates.filter(c=>c.recommendation==="adjust").map(c=>c.variable);const inDag=prop.filter(v=>g.nodes.has(v));
+    const m=g.minimal(d.exposure,d.outcome);
+    return{dagitty:toDagitty(d),minimal:m.sets,truncated:m.truncated,proposed:prop,notInDag:prop.filter(v=>!g.nodes.has(v)),sufficient:g.backdoor(d.exposure,d.outcome,inDag),descendants:[...g.desc(d.exposure)]}}
+  catch(e){return{error:e.message}}
+}
+function refIndex(ledger){const m={};ledger.papers.forEach((p,i)=>m[p.id]=i+1);return m}
+function shortCite(p){if(p.source_type==="uploaded")return`Uploaded: ${p.title||p.file||p.id}`;const a=(p.first_author||"").split(" ")[0];return`${a||"PMID "+p.pmid}${p.year?" "+p.year:""}`}
+function toMarkdown(ledger,an,summary,fixes,val){
+  const R=refIndex(ledger),P=Object.fromEntries(ledger.papers.map(p=>[p.id,p]));const q=ledger.question;const L=[];
+  const recTxt={adjust:"Yes",do_not_adjust:"No",sensitivity_only:"Sensitivity only",undecided:"Undecided"};
+  L.push(`# Confounder selection report`,``,`Population: ${q.population}  `,`Exposure(s): ${q.exposures.join("; ")}  `,`Outcome(s): ${q.outcomes.join("; ")}  `,`Design: ${q.design}; estimand: ${q.estimand}; time zero: ${q.time_zero||"not stated"}`,``);
+  if(summary.headline)L.push(`**${summary.headline}**`,``);
+  L.push(`## Recommended adjustment set`,``,ledger.candidates.filter(c=>c.recommendation==="adjust").map(c=>c.variable).join(", ")||"None",``);
+  L.push(`## Summary`,``,`| Variable (timing) | Suggested by | What the source shows | Role | Adjust? |`,`|---|---|---|---|---|`);
+  for(const c of ledger.candidates){const src=[...new Set(c.evidence.map(e=>e.paper_id))].map(id=>`${shortCite(P[id])} [${R[id]}]`).join("; ")||(c.researcher_proposed?"Researcher-proposed":"No supporting paper");
+    const shows=c.evidence.slice(0,2).map(e=>`[${R[e.paper_id]}] ${e.finding}`).join(" ");L.push(`| ${c.variable} (${c.measurement_timing.replace("_"," ")}) | ${src} | ${shows.replace(/\|/g,"/")} | ${c.role} | ${recTxt[c.recommendation]} |`)}
+  L.push(``);
+  if(an&&!an.error){L.push(`## DAG`,``,"```",an.dagitty,"```",``,`Minimal sufficient adjustment sets (back-door): ${an.minimal.map(s=>"{"+s.join(", ")+"}").join(" ")||"none among measured variables"}`,`Proposed set sufficient under this DAG: ${an.sufficient?"yes":"no"}`,``)}
+  if(summary.disjunctive_cause_set?.length)L.push(`Modified disjunctive cause criterion set: ${summary.disjunctive_cause_set.join(", ")}`,``);
+  for(const[k,t]of[["design_notes","Design notes and assumptions"],["sensitivity_analyses","Sensitivity analyses"],["limitations","Limitations"]])if(summary[k]?.length){L.push(`## ${t}`,``,...summary[k].map(x=>`- ${x}`),``)}
+  if(q.assumptions?.length)L.push(`Assumptions: ${q.assumptions.join("; ")}`,``);
+  L.push(`## Variable details`,``);for(const c of ledger.candidates){L.push(`### ${c.variable}`,`${c.definition}  `,`Role: ${c.role}; recommendation: ${recTxt[c.recommendation]}; timing: ${c.measurement_timing}  `,`${c.rationale}`,``,...c.evidence.map(e=>`- [${R[e.paper_id]}] (${e.support_type.replace(/_/g," ")}, ${e.location}) ${e.finding}`),``)}
+  if(fixes.length||val.errors.length||val.warnings.length)L.push(`## Automated checks`,``,...fixes.map(x=>`- Fixed: ${x}`),...val.errors.map(x=>`- Error: ${x}`),...val.warnings.map(x=>`- Warning: ${x}`),``);
+  L.push(`## Search log`,``,...ledger.search_log.map(s=>`- ${s.date} PubMed (${s.purpose.replace(/_/g," ")}${s.candidate?": "+s.candidate:""}): \`${s.query}\` — ${s.n_results} results`),``);
+  L.push(`## References`,``,`Retrieved from PubMed via the PubMed connector unless marked uploaded.`,``);
+  ledger.papers.forEach((p,i)=>L.push(`${i+1}. ${p.source_type==="uploaded"?"[Uploaded] "+(p.title||p.file):`${p.first_author||""}${p.year?" ("+p.year+")":""}. ${p.title}. ${p.journal||""}. PMID ${p.pmid}${p.doi?". https://doi.org/"+p.doi:""}`}${p.required?" — required":""}`));
+  return L.join("\n");
+}
+/*CORE-END*/
+
+{
+const $=id=>document.getElementById(id);
+const S={files:[],sample:null,mcp:null,downloads:null,last:null};
+const SERVER="PubMed";
+const today=new Date().toISOString().slice(0,10);
+
+/* remember inputs */
+const KEYS=["pop","exp","out","ids","com","des","est","tz"];
+try{const saved=JSON.parse(localStorage.getItem("cs-inputs")||"{}");for(const k of KEYS)if(saved[k])$(k).value=saved[k]}catch(e){}
+const remember=()=>{try{localStorage.setItem("cs-inputs",JSON.stringify(Object.fromEntries(KEYS.map(k=>[k,$(k).value]))))}catch(e){}};
+for(const k of KEYS)$(k).addEventListener("input",remember);
+
+/* capabilities */
+(async()=>{
+  try{S.sample=await window.claude?.use("sample")}catch(e){}
+  try{S.mcp=await window.claude?.use("mcp")}catch(e){}
+  try{S.downloads=await window.claude?.use("downloads")}catch(e){}
+  const cap=$("cap");
+  if(!S.sample){cap.hidden=false;cap.className="banner err";cap.textContent="This page needs to be opened on claude.ai while signed in: the analysis runs on Claude, and it is not available in this view.";$("go").disabled=true}
+  else if(!S.mcp){cap.hidden=false;cap.className="banner warn";cap.textContent="PubMed is not available in this view, so the tool can only use papers you upload. Open the page on claude.ai and add the PubMed connector (Settings → Connectors) for literature search."}
+})();
+
+/* files */
+const renderFiles=()=>{$("files").innerHTML=S.files.map((f,i)=>`<li><span>${esc(f.name)} <span class="note">${(f.size/1024).toFixed(0)} KB</span></span><button type="button" class="x" data-i="${i}" aria-label="Remove ${esc(f.name)}">×</button></li>`).join("")};
+const addFiles=list=>{for(const f of list)if(/\.(pdf|txt|md)$/i.test(f.name)&&!S.files.some(g=>g.name===f.name))S.files.push(f);renderFiles()};
+$("pick").addEventListener("click",()=>$("file").click());
+$("file").addEventListener("change",e=>{addFiles(e.target.files);e.target.value=""});
+$("files").addEventListener("click",e=>{const b=e.target.closest(".x");if(b){S.files.splice(+b.dataset.i,1);renderFiles()}});
+const drop=$("drop");
+drop.addEventListener("dragover",e=>{e.preventDefault();drop.classList.add("over")});
+drop.addEventListener("dragleave",()=>drop.classList.remove("over"));
+drop.addEventListener("drop",e=>{e.preventDefault();drop.classList.remove("over");addFiles(e.dataTransfer.files)});
+
+async function fileText(f){
+  if(/\.pdf$/i.test(f.name)){
+    if(!window.pdfjsLib)throw new Error("PDF reader did not load; upload a .txt copy instead.");
+    pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    const doc=await pdfjsLib.getDocument({data:new Uint8Array(await f.arrayBuffer())}).promise;let t="";
+    for(let i=1;i<=Math.min(doc.numPages,40);i++){const p=await doc.getPage(i);const c=await p.getTextContent();t+=c.items.map(x=>x.str).join(" ")+"\n"}
+    return t;
+  }
+  return await f.text();
+}
+
+/* progress */
+const STEPS=[["read","Reading your papers"],["plan","Planning PubMed searches"],["search","Searching PubMed for exposure–outcome studies"],["harvest","Extracting candidate confounders from papers"],["corr","Searching for each candidate's links to exposure and outcome"],["final","Classifying variables and building the DAG"],["check","Checking every citation and the adjustment set"]];
+const stepEl={};
+function resetSteps(){$("steps").hidden=false;$("steps").innerHTML=STEPS.map(([k,t])=>`<li id="st-${k}"><i></i><div>${t}<small></small></div></li>`).join("");for(const[k]of STEPS)stepEl[k]=$("st-"+k)}
+function step(k,state,detail){const li=stepEl[k];li.className=state;li.querySelector("i").textContent=state==="done"?"✓":state==="fail"?"!":"";if(detail!==undefined)li.querySelector("small").textContent=detail}
+
+/* connector + Claude wrappers */
+function mcpMsg(e){const c=e?.code;return c==="server_not_connected"?"The PubMed connector is not added to your account. Add PubMed in claude.ai Settings → Connectors, then run again."
+  :c==="needs_reauth"?"Reconnect PubMed in claude.ai Settings → Connectors.":c==="not_in_manifest"||c==="approval_required"?"PubMed access was not allowed for this page. Run again and choose Allow when asked."
+  :c==="blocked_by_policy"?"Your organization blocks the PubMed connector here.":c==="selection_required"?"Choose which PubMed connector to use when claude.ai asks, then run again.":"PubMed did not respond ("+(c||"error")+"). Try again in a minute."}
+async function pm(tool,input){
+  try{const r=await S.mcp.callTool(SERVER,tool,input);return r.payload}
+  catch(e){if(e?.retryable){await new Promise(r=>setTimeout(r,(e.retryAfterMs||1500)+Math.random()*800));try{return(await S.mcp.callTool(SERVER,tool,input)).payload}catch(e2){throw Object.assign(new Error(mcpMsg(e2)),{fatal:true})}}
+    throw Object.assign(new Error(mcpMsg(e)),{fatal:!["tool_error"].includes(e?.code)})}
+}
+async function ask(prompt,tier="default"){
+  const opts={modelTier:tier,cache:false};
+  try{
+    if(typeof S.sample.json==="function")return await S.sample.json(prompt,opts);
+    const r=await S.sample(prompt,opts);const m=r.text.match(/\{[\s\S]*\}/);return JSON.parse(m?m[0]:r.text);
+  }catch(e){
+    if(e?.code==="not_granted")throw new Error("Claude access was not allowed for this page. Run again and choose Allow.");
+    if(e?.code==="rate_limited")throw new Error("Claude is rate-limiting this page. Wait a few minutes and run again.");
+    if(e instanceof SyntaxError)throw new Error("Claude returned an unreadable answer. Run again.");
+    throw new Error("Claude could not finish a step"+(e?.message?": "+e.message:"."));
+  }
+}
+const yearOf=a=>parseInt(a?.publication_date?.year||a?.electronic_publication_date?.year)||undefined;
+async function fetchMeta(pmids,store,{fullTextFor=0}={}){
+  const need=pmids.filter(p=>!store[p]);
+  for(let i=0;i<need.length;i+=15){
+    const pay=await pm("get_article_metadata",{pmids:need.slice(i,i+15)});
+    for(const a of (pay?.articles||[])){const id=String(a.identifiers?.pmid||"");if(!id)continue;
+      store[id]={title:String(a.title||"").replace(/\.$/,""),abstract:String(a.abstract||""),doi:a.identifiers?.doi||a.doi||"",pmc:a.identifiers?.pmc||"",year:yearOf(a),journal:a.journal?.title||a.journal?.iso_abbreviation||"",firstAuthor:a.authors?.[0]?`${a.authors[0].last_name} ${a.authors[0].initials||""}`.trim():"",types:a.article_types||[]}}
+  }
+  let n=0;
+  for(const p of pmids){if(n>=fullTextFor)break;const r=store[p];if(!r||!r.pmc||r.fullText!==undefined)continue;
+    try{const pay=await pm("get_full_text_article",{pmc_ids:[r.pmc]});const ft=pay?.articles?.[0]?.full_text||"";r.fullText=adjustmentSentences(ft,2200);n++}catch(e){if(e.fatal)throw e;r.fullText=""}}
+}
+async function search(query,purpose,max,log,candidate){
+  const pay=await pm("search_articles",{query,max_results:max});
+  log.push({source:"PubMed",query,date:today,purpose,...(candidate?{candidate}:{}),n_results:Number(pay?.total_count)||0});
+  return (pay?.pmids||[]).map(String);
+}
+const digest=(id,r,abs=1100)=>({paper_id:id,title:r.title,year:r.year,journal:r.journal,types:(r.types||[]).join(", "),abstract:r.abstract.slice(0,abs),adjustment_text_from_full_text:r.fullText||undefined});
+
+const RULES=`Rules you must follow:
+- Use ONLY the papers provided below, identified by their paper_id. Never cite a paper, PMID, DOI, author or statistic that is not in the provided text.
+- A covariate that a paper adjusted for is "adjusted_in_model" evidence only. Use causes_*/associated_with_* only when the provided text reports that relationship. Use "causes_*" only for trials, strong longitudinal designs or reviews that conclude causality.
+- Paraphrase findings. A quote is optional, must be copied exactly from the provided text, and must be 25 words or fewer.
+- Do not select variables by p-values or change-in-estimate.
+- Reply with one JSON object only, no prose.`;
+
+async function run(e){
+  e.preventDefault();$("err").hidden=true;
+  const pop=$("pop").value.trim(),exp=$("exp").value.trim(),out=$("out").value.trim();
+  if(!pop||!exp||!out){$("err").hidden=false;$("err").textContent="Fill in the target population, exposure(s) and outcome(s).";return}
+  remember();$("go").disabled=true;$("report").hidden=true;resetSteps();
+  const log=[],pubmed={},uploads=[];let cur="read";
+  try{
+    /* 1 read uploads + required ids */
+    step("read","run");
+    for(const [i,f] of S.files.entries()){const t=await fileText(f);uploads.push({id:"U"+(i+1),name:f.name,head:t.replace(/\s+/g," ").slice(0,2500),adj:adjustmentSentences(t,3500),chars:t.length})}
+    const ids=parseIds($("ids").value);let requiredPmids=[...ids.pmids];
+    if(S.mcp&&ids.dois.length){const pay=await pm("convert_article_ids",{ids:ids.dois,id_type:"doi"});for(const r of pay?.records||[])if(r.pmid)requiredPmids.push(String(r.pmid))}
+    requiredPmids=[...new Set(requiredPmids)];
+    if(S.mcp&&requiredPmids.length)await fetchMeta(requiredPmids,pubmed,{fullTextFor:requiredPmids.length});
+    const missing=requiredPmids.filter(p=>!pubmed[p]);requiredPmids=requiredPmids.filter(p=>pubmed[p]);
+    step("read","done",`${uploads.length} uploaded, ${requiredPmids.length} by PMID/DOI`+(missing.length?`; not found in PubMed: ${missing.join(", ")}`:"")+(uploads.some(u=>u.chars<500)?" — one upload had almost no text (scanned PDF?)":""));
+
+    /* 2 plan */
+    cur="plan";step("plan","run");
+    const qIn={population:pop,exposures:exp,outcomes:out,design:$("des").value,estimand:$("est").value,time_zero:$("tz").value.trim(),comments:$("com").value.trim()};
+    const plan=await ask(`You are the planning step of Confounder Selector, a tool that helps epidemiologists choose confounders from the literature.
+Research question from the researcher (free text): ${JSON.stringify(qIn)}
+Papers the researcher uploaded and must cite (text extracted from PDFs; "adj" holds sentences mentioning adjustment): ${JSON.stringify(uploads.map(u=>({id:u.id,file:u.name,beginning:u.head,adj:u.adj})))}
+Return JSON: {"question":{"population":str,"exposures":[str],"comparator":str,"outcomes":[str],"design":"cohort|case-control|cross-sectional|case-crossover|other|unspecified","estimand":"total_effect|direct_effect|unspecified","time_zero":str,"assumptions":[str]},
+"uploads":[{"id":"U1","title":str or null,"adjustment_set":[{"variable":str,"location":str,"quote":str}],"note":str}],
+"exposure_node":"short DAG name for the exposure","outcome_node":"short DAG name for the outcome",
+"queries":[{"query":str,"purpose":"exposure_outcome_studies|review"}]}
+- If design/estimand/time zero are not given, choose the most plausible (usually a prospective cohort, total effect, baseline) and say so in assumptions.
+- For uploads, list only covariates the text says were adjusted/controlled for; title from the text or null. Never invent.
+- queries: 4 to 6 PubMed queries. PubMed ANDs every term, so use at most about five key terms; use (a OR b) for synonyms; no wildcards. Make at least one a review query ending AND (systematic review[pt] OR meta-analysis[pt]). Favor cohort/longitudinal studies in a similar population.
+Reply with one JSON object only.`,"default");
+    const question={population:plan.question?.population||pop,exposures:plan.question?.exposures?.length?plan.question.exposures.map(String):[exp],comparator:String(plan.question?.comparator||""),outcomes:plan.question?.outcomes?.length?plan.question.outcomes.map(String):[out],design:pickEnum(qIn.design!=="unspecified"?qIn.design:plan.question?.design,["cohort","case-control","cross-sectional","case-crossover","other","unspecified"],"unspecified"),estimand:pickEnum(qIn.estimand!=="unspecified"?qIn.estimand:plan.question?.estimand,["total_effect","direct_effect","unspecified"],"unspecified"),time_zero:qIn.time_zero||String(plan.question?.time_zero||""),assumptions:(plan.question?.assumptions||[]).map(String)};
+    for(const u of uploads){const pu=(plan.uploads||[]).find(x=>x.id===u.id);if(pu?.title)u.title=String(pu.title);u.planned=pu}
+    const queries=(plan.queries||[]).filter(q=>q?.query).slice(0,6);
+    step("plan","done",queries.length?`${queries.length} searches planned`:"no searches planned");
+
+    /* 3 search */
+    cur="search";step("search","run");let eo=[];
+    if(S.mcp){for(const q of queries){const ids=await search(String(q.query),q.purpose==="review"?"review":"exposure_outcome_studies",8,log);eo.push(...ids)}
+      eo=[...new Set(eo)].filter(p=>!requiredPmids.includes(p)).slice(0,28);await fetchMeta(eo,pubmed,{fullTextFor:8})}
+    step("search",S.mcp?"done":"fail",S.mcp?`${eo.length} papers retrieved; ${eo.filter(p=>pubmed[p]?.fullText).length} with full-text methods`:"skipped: PubMed not available");
+
+    /* 4 harvest */
+    cur="harvest";step("harvest","run");
+    const pool=[...requiredPmids,...eo].filter(p=>pubmed[p]);
+    const harvest=await ask(`You are the evidence-harvesting step of Confounder Selector.
+Question: ${JSON.stringify(question)}
+Researcher comments: ${JSON.stringify(qIn.comments)}
+Required uploaded papers (cite as U1, U2…): ${JSON.stringify(uploads.map(u=>({paper_id:u.id,title:u.title||u.name,adjustment_set:u.planned?.adjustment_set||[],adj_text:u.adj})))}
+Required PubMed papers: ${JSON.stringify(requiredPmids)}
+PubMed papers (paper_id = PMID): ${JSON.stringify(pool.map(p=>digest(p,pubmed[p])))}
+Return JSON: {"candidates":[{"variable":"short canonical name, e.g. Age, Sex, Smoking status","definition":str,"evidence":[{"paper_id":str,"support_type":"${SUPPORT.join("|")}","location":"Abstract|Methods (full text)|…","finding":str,"quote":str}]}],
+"queries":[{"candidate":str,"purpose":"candidate_exposure_link|candidate_outcome_link","query":str}]}
+- Merge synonyms into one candidate. Include every covariate from the required papers. Aim for 6 to 15 candidates, favoring variables adjusted for in several relevant studies or clearly related to exposure or outcome.
+- Also note potential mediators (consequences of the exposure) with mediator_evidence when the text shows it.
+- Add variables the researcher's comments propose, even with no evidence.
+- queries: up to 12 short PubMed queries (at most about five terms) to find evidence that a candidate affects the exposure or the outcome, for the candidates where that evidence is missing above.
+${RULES}`,"complex");
+    const cq=(harvest.queries||[]).filter(q=>q?.query&&q?.candidate).slice(0,12);
+    step("harvest","done",`${(harvest.candidates||[]).length} candidate variables`);
+
+    /* 5 corroborate */
+    cur="corr";step("corr","run");let co=[];
+    if(S.mcp){for(const q of cq){const ids=await search(String(q.query),q.purpose==="candidate_exposure_link"?"candidate_exposure_link":"candidate_outcome_link",4,log,String(q.candidate));co.push(...ids)}
+      co=[...new Set(co)].filter(p=>!pubmed[p]).slice(0,36);await fetchMeta(co,pubmed)}
+    step("corr",S.mcp?"done":"fail",S.mcp?`${cq.length} searches, ${co.length} new papers`:"skipped: PubMed not available");
+
+    /* 6 final */
+    cur="final";step("final","run");
+    const fin=await ask(`You are the final step of Confounder Selector. Classify each candidate and propose an adjustment set.
+Question: ${JSON.stringify(question)}
+Researcher comments: ${JSON.stringify(qIn.comments)}
+Exposure node name: ${JSON.stringify(plan.exposure_node||"Exposure")}; outcome node name: ${JSON.stringify(plan.outcome_node||"Outcome")}
+Candidates with evidence so far: ${JSON.stringify(harvest.candidates||[])}
+Additional PubMed papers from targeted searches (paper_id = PMID): ${JSON.stringify(co.filter(p=>pubmed[p]).map(p=>digest(p,pubmed[p],800)))}
+Valid paper_ids: ${JSON.stringify([...uploads.map(u=>u.id),...Object.keys(pubmed)])}
+Required papers: ${JSON.stringify([...uploads.map(u=>u.id),...requiredPmids])}
+Return JSON: {"candidates":[{"variable":str,"definition":str,"measurement_timing":"${TIMING.join("|")}","role":"${ROLES.join("|")}","recommendation":"${RECS.join("|")}","rationale":"2-3 sentences: why this role, what timing assumption","researcher_proposed":bool,"evidence":[{"paper_id":str,"support_type":str,"location":str,"finding":str,"quote":str}]}],
+"dag":{"exposure":str,"outcome":str,"edges":[["from","to"]],"latent":[str],"edge_sources":{"from->to":[paper_id]}},
+"summary":{"headline":"one sentence giving the recommended set and the key caveat","disjunctive_cause_set":[str],"design_notes":[str],"sensitivity_analyses":[str],"limitations":[str]},
+"required_notes":{"paper_id":"why this required paper contributed no candidate"}}
+- Keep the earlier evidence and add evidence from the additional papers. Every candidate recommended "adjust" or "sensitivity_only" must have at least one evidence item, unless researcher_proposed is true.
+- Timing follows the time zero. For a total effect, never recommend adjusting for a post-exposure variable; consider "sensitivity_only".
+- DAG: use the exact candidate variable names and the exposure/outcome node names; include edges you consider plausible and justify key ones in edge_sources; add a latent node (e.g. "U_unmeasured") only for plausible unmeasured common causes. No cycles.
+- disjunctive_cause_set: the set from VanderWeele's modified disjunctive cause criterion (pre-exposure causes of the exposure or the outcome, minus known instruments, plus proxies for unmeasured common causes).
+- design_notes: practical decisions (restrictions, exclusions, measurement timing); sensitivity_analyses: 2 to 4 concrete ones (e.g. E-value, adding disputed variables, negative controls); limitations: be candid that evidence comes mostly from abstracts.
+- If the researcher's comments list available variables, note in design_notes any recommended variable they do not have.
+${RULES}`,"complex");
+    step("final","done");
+
+    /* 7 check */
+    cur="check";step("check","run");
+    const {ledger,dropped}=buildLedger({question,searchLog:log,pubmed,uploads,requiredPmids,model:fin,today});
+    const fixes=enforce(ledger);for(const d of dropped)fixes.unshift(`${d.variable}: removed a citation to "${d.paper_id}", which is not a paper the tool retrieved or you uploaded.`);
+    const val=validateLedger(ledger);const an=analyzeDag(ledger);
+    step("check","done",`${ledger.papers.filter(p=>p.source_type==="retrieved").length} citations fetched from PubMed by PMID; ${fixes.length} automatic fix${fixes.length===1?"":"es"}`);
+    S.last={ledger,an,summary:fin.summary||{},fixes,val};
+    render(S.last);
+  }catch(err){step(cur,"fail");$("err").hidden=false;$("err").textContent=err.message||String(err)}
+  finally{$("go").disabled=false}
+}
+$("f").addEventListener("submit",run);
+
+/* report */
+const recTag={adjust:'<span class="tag y">Adjust</span>',do_not_adjust:'<span class="tag n">Do not adjust</span>',sensitivity_only:'<span class="tag m">Sensitivity only</span>',undecided:'<span class="tag m">Undecided</span>'};
+const supTxt=s=>s.replace(/_/g," ");
+function paperLink(p,R){const n=R[p.id];if(p.source_type==="uploaded")return`<span class="ref">[${n}]</span>`;return`<a class="ref" href="https://pubmed.ncbi.nlm.nih.gov/${esc(p.pmid)}/" target="_blank" rel="noopener">[${n}]</a>`}
+function render({ledger,an,summary,fixes,val}){
+  const R=refIndex(ledger),P=Object.fromEntries(ledger.papers.map(p=>[p.id,p]));const q=ledger.question;const C=ledger.candidates;
+  const adj=C.filter(c=>c.recommendation==="adjust"),sens=C.filter(c=>c.recommendation==="sensitivity_only"),no=C.filter(c=>c.recommendation==="do_not_adjust");
+  const list=a=>a?.length?`<ul class="plain">${a.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:'<p class="note">None given.</p>';
+  let h=`<div class="verdict"><h2 style="margin:0">Recommended adjustment set</h2>${summary.headline?`<p>${esc(summary.headline)}</p>`:""}${fixes.length?`<p class="banner warn" style="margin-top:12px">Automatic checks changed ${fixes.length} recommendation${fixes.length===1?"":"s"} after Claude's answer (see Automated checks); the chips below reflect the corrected set.</p>`:""}
+  <div class="chips">${adj.map(c=>`<span class="chip">${esc(c.variable)}</span>`).join("")||'<span class="note">No variable met the evidence bar.</span>'}${sens.map(c=>`<span class="chip maybe">${esc(c.variable)} · sensitivity</span>`).join("")}${no.map(c=>`<span class="chip no">${esc(c.variable)} · exclude</span>`).join("")}</div>
+  <div class="row" style="margin-top:18px"><button class="btn" id="dl-led" type="button">Download evidence ledger (JSON)</button><button class="btn ghost" id="dl-md" type="button">Download report (Markdown)</button><button class="btn ghost" id="cp-md" type="button">Copy report</button><span class="note" id="dl-msg"></span></div></div>
+  <p class="note">${esc(q.population)} · Exposure: ${esc(q.exposures.join("; "))} · Outcome: ${esc(q.outcomes.join("; "))} · ${esc(q.design)}, ${esc(q.estimand.replace("_"," "))}${q.time_zero?", time zero: "+esc(q.time_zero):""}</p>
+  <section class="part"><h2>Where each variable came from</h2><div class="scroll"><table class="stack"><thead><tr><th>Variable (timing)</th><th>Suggested by</th><th>What the source shows</th><th>Role</th><th>Adjust?</th></tr></thead><tbody>
+  ${C.map(c=>{const ids=[...new Set(c.evidence.map(e=>e.paper_id))];const by=ids.map(id=>`${esc(shortCite(P[id]))} ${paperLink(P[id],R)}`).join("<br>")||(c.researcher_proposed?"Researcher-proposed":'<span class="tag n">No paper</span>');
+    return`<tr><td><b>${esc(c.variable)}</b><br><span class="note">${esc(c.measurement_timing.replace("_"," "))}</span></td><td>${by}</td><td>${c.evidence.slice(0,2).map(e=>`${paperLink(P[e.paper_id],R)} ${esc(e.finding)}`).join("<br>")}</td><td>${esc(c.role)}</td><td>${recTag[c.recommendation]}</td></tr>`}).join("")}
+  </tbody></table></div></section>`;
+  const req=ledger.papers.filter(p=>p.required);
+  if(req.length)h+=`<section class="part"><h2>Papers you must cite</h2><ul class="plain">${req.map(p=>{const vars=C.filter(c=>c.evidence.some(e=>e.paper_id===p.id)).map(c=>c.variable);return`<li>${paperLink(p,R)} ${esc(p.title||p.file)} — ${vars.length?"contributed: "+esc(vars.join(", ")):esc(p.required_note||"contributed no variable")}</li>`}).join("")}</ul></section>`;
+  h+=`<section class="part"><h2>Assumed causal diagram</h2>`;
+  if(an&&!an.error){h+=`<div class="fig" id="dagfig" style="min-height:440px"><svg aria-label="Causal diagram"></svg></div>
+    <div class="cols" style="margin-top:16px"><div><h3>Adjustment check</h3><p>Minimal sufficient sets under this DAG (back-door criterion): ${an.minimal.length?an.minimal.map(s=>"<b>{"+esc(s.join(", "))+"}</b>").join(" or "):"none among measured variables; unmeasured confounding cannot be blocked"}${an.truncated?" (sets larger than 6 not searched)":""}.</p>
+    <p>The recommended set is <b>${an.sufficient?"sufficient":"not sufficient"}</b> under this DAG.${an.notInDag.length?" Not in DAG: "+esc(an.notInDag.join(", "))+".":""}</p>
+    ${summary.disjunctive_cause_set?.length?`<p>Modified disjunctive cause criterion: ${esc(summary.disjunctive_cause_set.join(", "))}.</p>`:""}</div>
+    <div><h3>DAGitty code</h3><div class="row"><button class="btn ghost" id="cp-dag" type="button" style="min-height:40px;padding:8px 14px">Copy</button><a href="https://www.dagitty.net/dags.html" target="_blank" rel="noopener">Open DAGitty</a></div><pre id="dagcode">${esc(an.dagitty)}</pre></div></div>`}
+  else h+=`<p class="note">${esc(an?.error||"No DAG was produced.")}</p>`;
+  h+=`</section><section class="part cols"><div><h2>Design decisions</h2>${list([...(summary.design_notes||[]),...q.assumptions.map(a=>"Assumed: "+a)])}</div><div><h2>Sensitivity analyses</h2>${list(summary.sensitivity_analyses)}</div></section>
+  <section class="part"><h2>Evidence limitations</h2>${list(summary.limitations)}</section>
+  <section class="part"><h2>Variable details</h2>${C.map(c=>`<details class="var"><summary>${esc(c.variable)} ${recTag[c.recommendation]} <span class="note">${esc(c.role)}</span></summary>
+    ${c.definition?`<p>${esc(c.definition)}</p>`:""}<p>${esc(c.rationale)}</p><ul class="plain">${c.evidence.map(e=>`<li>${paperLink(P[e.paper_id],R)} <b>${esc(supTxt(e.support_type))}</b> (${esc(e.location)}): ${esc(e.finding)}${e.quote?` <span class="note">“${esc(e.quote)}”</span>`:""}</li>`).join("")||"<li>No supporting paper.</li>"}</ul></details>`).join("")}</section>`;
+  if(fixes.length||val.errors.length||val.warnings.length)h+=`<section class="part"><h2>Automated checks</h2><ul class="plain">${fixes.map(x=>`<li><b>Fixed:</b> ${esc(x)}</li>`).join("")}${val.errors.map(x=>`<li style="color:var(--cr)"><b>Error:</b> ${esc(x)}</li>`).join("")}${val.warnings.map(x=>`<li><b>Note:</b> ${esc(x)}</li>`).join("")}</ul></section>`;
+  h+=`<section class="part"><h2>Search log</h2><div class="scroll"><table class="stack"><thead><tr><th>Purpose</th><th>PubMed query</th><th style="text-align:right">Results</th></tr></thead><tbody>${ledger.search_log.map(s=>`<tr><td>${esc(supTxt(s.purpose))}${s.candidate?": "+esc(s.candidate):""}</td><td><code>${esc(s.query)}</code></td><td style="text-align:right">${esc(s.n_results.toLocaleString())}</td></tr>`).join("")||'<tr><td colspan="3">No searches were run.</td></tr>'}</tbody></table></div><p class="note">Run on ${esc(today)}.</p></section>
+  <section class="part"><h2>References</h2><p class="note">Retrieved from PubMed through the PubMed connector unless marked uploaded. Each retrieved record was fetched by its PMID.</p><ol class="refs">${ledger.papers.map(p=>`<li>${p.source_type==="uploaded"?`<b>Uploaded:</b> ${esc(p.title||p.file)}`:`${esc(p.first_author)}${p.year?" ("+esc(p.year)+")":""}. ${esc(p.title)}. <i>${esc(p.journal)}</i>. <a href="https://pubmed.ncbi.nlm.nih.gov/${esc(p.pmid)}/" target="_blank" rel="noopener">PMID ${esc(p.pmid)}</a>${p.doi&&/^10\./.test(p.doi)?` · <a href="https://doi.org/${esc(p.doi)}" target="_blank" rel="noopener">DOI</a>`:""} <span class="note">(${esc(p.access_level.replace("_"," "))})</span>`}${p.required?' <span class="tag y">required</span>':""}</li>`).join("")}</ol></section>`;
+  $("rep").innerHTML=h;$("report").hidden=false;$("report").scrollIntoView({behavior:matchMedia("(prefers-reduced-motion:reduce)").matches?"auto":"smooth"});
+  const md=toMarkdown(ledger,an,summary,fixes,val);
+  const save=async(name,data)=>{const m=$("dl-msg");if(!S.downloads){m.textContent="Downloads are not available in this view; use Copy instead.";return}try{await S.downloads.save({filename:name,data});m.textContent="Saved."}catch(e){m.textContent="Download was cancelled or blocked."}};
+  $("dl-led").onclick=()=>save("confounder-ledger.json",JSON.stringify(ledger,null,2));
+  $("dl-md").onclick=()=>save("confounder-report.md",md);
+  $("cp-md").onclick=async()=>{try{await navigator.clipboard.writeText(md);$("dl-msg").textContent="Report copied."}catch(e){$("dl-msg").textContent="Copy was blocked by the browser."}};
+  const cd=$("cp-dag");if(cd)cd.onclick=async()=>{try{await navigator.clipboard.writeText(an.dagitty);cd.textContent="Copied"}catch(e){cd.textContent="Blocked"}};
+  if(an&&!an.error)drawDag(ledger);
+}
+let dagRO=null;
+function drawDag(ledger){
+  const box=document.getElementById("dagfig");const svg=box.querySelector("svg");const d=ledger.dag;const g=makeDag(d.edges,d.latent);
+  const X=d.exposure,Y=d.outcome,D=g.desc(X),L=new Set(d.latent||[]);const rec=Object.fromEntries(ledger.candidates.map(c=>[c.variable,c.recommendation]));
+  const others=[...g.nodes].filter(n=>n!==X&&n!==Y);
+  const mid=others.filter(n=>D.has(n));const top=others.filter(n=>!D.has(n)&&g.ch[n].has(X)&&!L.has(n));const bot=others.filter(n=>!mid.includes(n)&&!top.includes(n));
+  const draw=()=>{const W=box.clientWidth,H=Math.max(380,box.clientHeight),narrow=W<520,pad=narrow?50:80;const pos={};
+    const place=(arr,y,dir)=>arr.forEach((n,i)=>pos[n]={x:pad+(W-2*pad)*(arr.length===1?.5:i/(arr.length-1)),y:y+(arr.length>(narrow?3:5)&&i%2?dir*H*.13:0)});
+    place(top,H*.1,1);place(bot,H*.8,1);pos[X]={x:pad,y:H*.5};pos[Y]={x:W-pad,y:H*.5};
+    if(mid.length)mid.forEach((n,i)=>pos[n]={x:W*(i+1)/(mid.length+1),y:H*.5+(i%2?30:-30)});
+    const col=n=>n===X?"var(--co)":n===Y?"var(--ink)":L.has(n)?"var(--mut)":rec[n]==="adjust"?"var(--ok)":rec[n]==="do_not_adjust"?"var(--cr)":"var(--am)";
+    const lab=n=>{const s=narrow&&n.length>14?n.slice(0,13)+"…":n;return s};
+    let s=`<defs><marker id="arr" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--mut)"/></marker></defs>`;
+    for(const[a,b]of d.edges){const p=pos[a],q=pos[b];if(!p||!q)continue;const dx=q.x-p.x,dy=q.y-p.y,len=Math.hypot(dx,dy)||1,r=24;const x1=p.x+dx/len*r,y1=p.y+dy/len*r,x2=q.x-dx/len*(r+4),y2=q.y-dy/len*(r+4);
+      const main=a===X&&b===Y;s+=`<path d="M${x1} ${y1}Q${(x1+x2)/2+(main?0:dy*.08)} ${(y1+y2)/2-(main?0:dx*.08)} ${x2} ${y2}" fill="none" stroke="${main?"var(--co)":"var(--mut)"}" stroke-width="${main?3:1.4}" ${L.has(a)?'stroke-dasharray="5 4"':""} marker-end="url(#arr)" opacity="${main?1:.75}"/>`}
+    for(const n of g.nodes){const p=pos[n];if(!p)continue;const t=lab(n),w=Math.max(44,t.length*(narrow?6.6:7.4)+20);
+      s+=`<g><rect x="${p.x-w/2}" y="${p.y-15}" width="${w}" height="30" rx="15" fill="var(--bg)" stroke="${col(n)}" stroke-width="2" ${L.has(n)?'stroke-dasharray="4 3"':""}/><text x="${p.x}" y="${p.y+5}" text-anchor="middle" font-size="${narrow?11:13}" font-weight="600" fill="${col(n)}">${esc(t)}</text></g>`}
+    s+=`<g font-size="12" fill="var(--mut)"><text x="12" y="${H-10}">${narrow?"Green adjust · Red exclude · Amber other":"Green: adjust · Red: do not adjust · Amber: sensitivity/undecided · Dashed: unmeasured"}</text></g>`;
+    svg.innerHTML=s};
+  if(dagRO)dagRO.disconnect();dagRO=new ResizeObserver(draw);dagRO.observe(box);
+}
+}
+</script>
+</body>
+</html>
