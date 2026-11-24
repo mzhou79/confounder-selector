@@ -13,6 +13,14 @@ Research decision support only; it does not replace domain expertise or prove ca
 - **DAG tooling.** `scripts/dag_tools.py` emits DAGitty code, enumerates minimal sufficient adjustment sets (back-door criterion), and checks the proposed set. The guidelines add VanderWeele's (2019) modified disjunctive cause criterion for use when the DAG is uncertain.
 - The schema is now the single source of truth (the validator reads `evidence-schema.json`; uses `jsonschema` if installed, with a built-in fallback).
 
+## Web app
+
+A no-install web version lives at **https://claude.ai/artifact/XpREDy3HH1fvNEQVCnfFJn** (source: `web/index.html`). Researchers fill in the target population, exposure(s), outcome(s), papers they must cite (PDF/text upload or PMIDs/DOIs) and free-text comments, and get the summary table, adjustment set, DAG with DAGitty code, sensitivity analyses, limitations, search log, references, and the evidence ledger to download.
+
+How it keeps citations real: the page itself runs the PubMed searches and fetches every paper by PMID through the PubMed connector; Claude only sees those records and can cite only their PMIDs (or your uploads). Any other citation is stripped, and a variable left without a supporting paper is demoted from the adjustment set before the report is shown. The provenance rules and back-door check are JavaScript ports of `scripts/validate_evidence.py` and `scripts/dag_tools.py`.
+
+Requirements for each user: a Claude account (the analysis uses their own Claude usage) and the free PubMed connector (claude.ai → Settings → Connectors). The owner shares the page from its claude.ai page. The page runs only inside claude.ai; it is not a standalone static site.
+
 ## Layout
 ```
 SKILL.md                         workflow and rules the model follows
